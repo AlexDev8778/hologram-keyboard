@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+.env/
+
+# Snapshots del test (generados por test_mediapipe.py)
+snapshot_*.png
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Config local (no versionar configs con rutas absolutas)
+config.local.yaml
+config.local.toml
+
+# Modelos descargados (pesados, no van al repo)
+*.task
+*.tflite
+
+# Logs
+*.log
