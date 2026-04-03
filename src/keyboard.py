@@ -26,26 +26,51 @@ class KeyButton:
 
     def draw(self, img):
         if self.state == "PRESS":
-            color = COLOR_BG_PRESS
+            bg_color = COLOR_BG_PRESS
+            border_color = (255, 255, 255)
+            font_color = (0, 0, 0) # Texto negro sobre fondo verde iluminado
+            thickness = 3
         elif self.state == "HOVER":
-            color = COLOR_BG_HOVER
+            bg_color = COLOR_BG_HOVER
+            border_color = (255, 255, 0) # Cyan BGR
+            font_color = COLOR_TEXT
+            thickness = 2
         else:
-            color = COLOR_BG_NORMAL
+            bg_color = COLOR_BG_NORMAL
+            border_color = (150, 150, 150)
+            font_color = COLOR_TEXT
+            thickness = 1
 
-        # Dibujar rectangulo
-        cv2.rectangle(img, (self.x, self.y), (self.x + self.width, self.y + self.height), color, cv2.FILLED)
-        # Borde
-        cv2.rectangle(img, (self.x, self.y), (self.x + self.width, self.y + self.height), COLOR_TEXT, 1)
+        # Dibujar rectangulo de fondo
+        cv2.rectangle(img, (self.x, self.y), (self.x + self.width, self.y + self.height), bg_color, cv2.FILLED)
+        
+        # Efecto Sci-Fi: Esquinas reforzadas (HUD Style)
+        L = 12 # Largo de las esquinas
+        # Arriba-Izq
+        cv2.line(img, (self.x, self.y), (self.x + L, self.y), border_color, thickness)
+        cv2.line(img, (self.x, self.y), (self.x, self.y + L), border_color, thickness)
+        # Arriba-Der
+        cv2.line(img, (self.x + self.width, self.y), (self.x + self.width - L, self.y), border_color, thickness)
+        cv2.line(img, (self.x + self.width, self.y), (self.x + self.width, self.y + L), border_color, thickness)
+        # Abajo-Izq
+        cv2.line(img, (self.x, self.y + self.height), (self.x + L, self.y + self.height), border_color, thickness)
+        cv2.line(img, (self.x, self.y + self.height), (self.x, self.y + self.height - L), border_color, thickness)
+        # Abajo-Der
+        cv2.line(img, (self.x + self.width, self.y + self.height), (self.x + self.width - L, self.y + self.height), border_color, thickness)
+        cv2.line(img, (self.x + self.width, self.y + self.height), (self.x + self.width, self.y + self.height - L), border_color, thickness)
+
+        # Borde ultra sutil intermedio si no esta presionado
+        if self.state != "PRESS":
+            cv2.rectangle(img, (self.x, self.y), (self.x + self.width, self.y + self.height), (80, 80, 80), 1)
 
         # Texto centrado
         font = cv2.FONT_HERSHEY_PLAIN
-        font_scale = 2
-        thickness = 2
-        text_size = cv2.getTextSize(self.text, font, font_scale, thickness)[0]
+        font_scale = 1.8 if len(self.text) < 4 else 1.2
+        text_size = cv2.getTextSize(self.text, font, font_scale, thickness if self.state != "NORMAL" else 1)[0]
         text_x = self.x + (self.width - text_size[0]) // 2
         text_y = self.y + (self.height + text_size[1]) // 2
 
-        cv2.putText(img, self.text, (text_x, text_y), font, font_scale, COLOR_TEXT, thickness)
+        cv2.putText(img, self.text, (text_x, text_y), font, font_scale, font_color, thickness if self.state != "NORMAL" else 1)
 
 
 class VirtualKeyboard:

@@ -22,7 +22,7 @@ ALPHA_KEYBOARD   = 0.65
 # --- CONFIGURACION DE DETECCION ---
 PINCH_THRESHOLD  = 0.05    # Distancia entre pulgar e indice para considerar "click"
 COOLDOWN_MS      = 300     # Tiempo muerto luego de presionar una tecla para no spamearla
-MIN_CONFIDENCE   = 0.70    # Elevado para evitar que confunda dedos (Meñiques, etc)
+MIN_CONFIDENCE   = 0.70    # Balance perfecto: no saltan tantos falsos positivos y sigue rastreando comodo
 CURSOR_SMOOTHING = 0.45    # Nivel de suavizado del cursor (1.0 = instantaneo, 0.1 = muy suave/lento)
 
 # --- LAYOUT DEL TECLADO ---

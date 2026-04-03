@@ -30,7 +30,7 @@ class HandDetector:
         result = self.detector.detect(mp_image)
         return result
 
-    def get_pointer_coordinates(self, hand_landmarks, img_width, img_height, hand_index=0):
+    def get_pointer_coordinates(self, hand_landmarks, img_width, img_height, hand_id="default"):
         """
         Extrae la coordenada del puntero (Punto medio entre Pulgar e Indice).
         Retorna (x_pixel, y_pixel).
@@ -47,15 +47,22 @@ class HandDetector:
         raw_y = int(((index_tip.y + thumb_tip.y) / 2) * img_height)
 
         # Aplicar suavizado (Exponential Moving Average) para evitar temblor
-        if hand_index not in self.history:
-            self.history[hand_index] = (raw_x, raw_y)
+        if hand_id not in self.history:
+            self.history[hand_id] = (raw_x, raw_y)
         else:
-            prev_x, prev_y = self.history[hand_index]
-            smooth_x = int((raw_x * CURSOR_SMOOTHING) + (prev_x * (1.0 - CURSOR_SMOOTHING)))
-            smooth_y = int((raw_y * CURSOR_SMOOTHING) + (prev_y * (1.0 - CURSOR_SMOOTHING)))
-            self.history[hand_index] = (smooth_x, smooth_y)
+            prev_x, prev_y = self.history[hand_id]
             
-        return self.history[hand_index]
+            # Anti-Teletransporte: Si la mano salto bruscamente de posicion (>150px),
+            # cortamos el suavizado de raiz para no verla flotando de un lado a otro.
+            dist = math.sqrt((raw_x - prev_x)**2 + (raw_y - prev_y)**2)
+            if dist > 150:
+                self.history[hand_id] = (raw_x, raw_y)
+            else:
+                smooth_x = int((raw_x * CURSOR_SMOOTHING) + (prev_x * (1.0 - CURSOR_SMOOTHING)))
+                smooth_y = int((raw_y * CURSOR_SMOOTHING) + (prev_y * (1.0 - CURSOR_SMOOTHING)))
+                self.history[hand_id] = (smooth_x, smooth_y)
+            
+        return self.history[hand_id]
 
     def is_pinching(self, hand_landmarks):
         """

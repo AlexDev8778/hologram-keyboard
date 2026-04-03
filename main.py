@@ -57,15 +57,23 @@ def main():
             result = detector.process_frame(frame)
             if hasattr(result, 'hand_landmarks'):
                 last_landmarks = result.hand_landmarks
+                last_handedness = result.handedness
             else:
                 last_landmarks = []
+                last_handedness = []
 
         # Extraer punteros y evaluar clicks
         pointers = []
         is_pinching_list = []
         
         for i, hand_lms in enumerate(last_landmarks):
-            pointer = detector.get_pointer_coordinates(hand_lms, w, h, i)
+            # Obtener identidad real de la mano ("Left" o "Right") en vez de usar 0 o 1 aleatorio
+            if 'last_handedness' in locals() and len(last_handedness) > i:
+                hand_id = last_handedness[i][0].category_name
+            else:
+                hand_id = str(i)
+                
+            pointer = detector.get_pointer_coordinates(hand_lms, w, h, hand_id)
             if pointer:
                 pointers.append(pointer)
                 is_pinching_list.append(detector.is_pinching(hand_lms))
