@@ -34,6 +34,11 @@ from mediapipe.tasks.python.vision import HandLandmarker, HandLandmarkerOptions,
 CAPTURE_WIDTH    = 640
 CAPTURE_HEIGHT   = 480
 CAMERA_INDEX     = None   # None = auto-detectar
+
+# DroidCam: pone la IP que muestra la app del telefono (ej: "192.168.1.5")
+# Dejalo en None para usar el driver virtual o auto-deteccion
+DROIDCAM_IP      = None
+DROIDCAM_PORT    = 4747
 PINCH_THRESHOLD  = 0.05
 MODEL_PATH       = "hand_landmarker.task"
 MODEL_URL        = (
@@ -203,43 +208,86 @@ def main():
     )
     detector = HandLandmarker.create_from_options(options)
 
-    # Detectar camara: probar MSMF (Media Foundation) y fallback sin backend
-    cam_idx = CAMERA_INDEX
-    if cam_idx is None:
-        print("  Buscando camara disponible (indices 0, 1, 2)...")
-        found = False
-        for backend, backend_name in [(cv2.CAP_MSMF, "MSMF"), (cv2.CAP_ANY, "AUTO")]:
-            if found:
+    # ── Deteccion de camara ──────────────────────────────────────────────────
+    # Estrategia:
+    #   1. DroidCam HTTP stream (la mas confiable, sin driver)
+    #   2. Virtual driver por indice (webcam fisica o DroidCam driver)
+
+    cap = None
+
+    # 1. Intentar DroidCam HTTP stream si hay una IP configurada
+    if DROIDCAM_IP:
+        url = f"http://{DROIDCAM_IP}:{DROIDCAM_PORT}/video"
+        print(f"  Probando DroidCam HTTP: {url}")
+        _test = cv2.VideoCapture(url)
+        if _test.isOpened():
+            ret_test, _ = _test.read()
+            if ret_test:
+                cap = _test
+                print(f"  DroidCam HTTP OK: {url}")
+            else:
+                _test.release()
+                print("  DroidCam HTTP: abre pero sin frame. Verifica que la app este activa.")
+        else:
+            print("  DroidCam HTTP: no responde. Verifica IP y que DroidCam este corriendo.")
+
+    # 2. Fallback: buscar camara por indice saltando las 'pantallas verdes' de DroidCam
+    if cap is None:
+        print("  Buscando camara por indice (0, 1, 2, 3)...")
+        for try_idx in range(4):
+            if cap is not None:
                 break
-            for try_idx in range(3):
+            for backend, bname in [(cv2.CAP_MSMF, "MSMF"), (cv2.CAP_ANY, "AUTO")]:
                 _test = cv2.VideoCapture(try_idx, backend)
                 if _test.isOpened():
-                    ret_test, _ = _test.read()
-                    _test.release()
-                    if ret_test:
-                        cam_idx = try_idx
-                        print(f"  Camara encontrada: index={cam_idx} backend={backend_name}")
-                        found = True
+                    # Leer unos cuantos frames porque el 1ro suele ser negro (inicializacion)
+                    for _ in range(5):
+                        ret_test, frame_test = _test.read()
+                    
+                    if ret_test and frame_test is not None:
+                        # Verificar si es la pantalla de espera verde de DroidCam
+                        g_mean = frame_test[:,:,1].mean()
+                        r_mean = frame_test[:,:,0].mean()
+                        if g_mean > r_mean * 1.5 and frame_test.mean() > 5:
+                            print(f"  Ignorando index={try_idx} (Devuelve pantalla verde de espera DroidCam)")
+                            _test.release()
+                            continue  # Sigue con la proxima camara
+                            
+                        # Es una camara valida con video
+                        cap = _test
+                        print(f"  Camara valida encontrada: index={try_idx} backend={bname}")
                         break
-                else:
-                    try:
-                        _test.release()
-                    except:
-                        pass
-        if not found:
-            print("ERROR: No se encontro ninguna camara.")
-            print("  Verifica que tu webcam esta conectada y no la esta usando otro programa.")
-            sys.exit(1)
+                    _test.release()
 
-    cap = cv2.VideoCapture(cam_idx, cv2.CAP_MSMF)
-    if not cap.isOpened():
-        cap = cv2.VideoCapture(cam_idx)  # fallback sin backend
-    if not cap.isOpened():
-        print(f"ERROR: No se pudo abrir la camara (index={cam_idx}).")
+    if cap is None:
+        print("\nERROR: No se encontro ninguna camara.")
+        print("  Opciones:")
+        print("  1. Pone la IP de DroidCam en DROIDCAM_IP al inicio del script")
+        print("  2. Conecta una webcam USB")
         sys.exit(1)
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  CAPTURE_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT)
+
+    # Warmup: descartar primeros frames mientras el driver virtual se inicializa
+    print("  Calentando camara (30 frames)...", end="", flush=True)
+    for _ in range(30):
+        cap.read()
+    print(" OK")
+
+    # Detectar si DroidCam envía la pantalla verde de desconectado
+    ret_check, frame_check = cap.read()
+    if ret_check and frame_check is not None:
+        mean_val = frame_check.mean()
+        g_mean = frame_check[:,:,1].mean()
+        r_mean = frame_check[:,:,0].mean()
+        print(f"  Frame check: shape={frame_check.shape} mean={mean_val:.1f} R={r_mean:.0f} G={g_mean:.0f}")
+        if g_mean > r_mean * 1.5 and mean_val > 5:
+            print("  AVISO: Frame verde detectado. Esto usualmente significa que DroidCam NO esta recibiendo video del telefono.")
+        else:
+            print("  Frame OK.")
+    else:
+        print("  AVISO: No se pudo leer frame de verificacion.")
 
     fps_counter = FPSCounter()
     diag        = Diagnostics()
@@ -255,6 +303,7 @@ def main():
             break
 
         frame = cv2.flip(frame, 1)
+
         h, w  = frame.shape[:2]
 
         # Convertir a MediaPipe Image
